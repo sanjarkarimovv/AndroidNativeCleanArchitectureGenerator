@@ -306,7 +306,7 @@ fun generateAppBuildGradle(config: ProjectConfig): String = buildString {
     if (config.useDetekt) {
         appendLine("    alias(libs.plugins.detekt)")
     }
-    appendLine("    alias(libs.plugins.kotlin.parcelize)")
+    appendLine("    id(\"kotlin-parcelize\")")
     appendLine("    alias(libs.plugins.app.android.flavors)")
     appendLine("}")
     appendLine()
@@ -560,7 +560,6 @@ fun generateVersionCatalog(config: ProjectConfig): String = buildString {
     appendLine("kotlin-compose = { id = \"org.jetbrains.kotlin.plugin.compose\", version.ref = \"kotlinVersion\" }")
     appendLine("ksp = { id = \"com.google.devtools.ksp\", version.ref = \"kspVersion\" }")
     appendLine("kotlin-serialization = { id = \"org.jetbrains.kotlin.plugin.serialization\", version.ref = \"kotlinVersion\" }")
-    appendLine("kotlin-parcelize = { id = \"org.jetbrains.kotlin.plugin.parcelize\", version.ref = \"kotlinVersion\" }")
     appendLine()
     appendLine("# ======================================Dependency Injection=====================================")
     appendLine("hilt = { id = \"com.google.dagger.hilt.android\", version.ref = \"hiltVersion\" }")
