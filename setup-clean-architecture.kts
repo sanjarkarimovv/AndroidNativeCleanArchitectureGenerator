@@ -306,8 +306,8 @@ fun generateAppBuildGradle(config: ProjectConfig): String = buildString {
     if (config.useDetekt) {
         appendLine("    alias(libs.plugins.detekt)")
     }
-    appendLine("    id(\"kotlin-parcelize\")")
-    appendLine("    id(\"${config.packageName}.android.flavors\")")
+    appendLine("    alias(libs.plugins.kotlin.parcelize)")
+    appendLine("    alias(libs.plugins.app.android.flavors)")
     appendLine("}")
     appendLine()
     appendLine("kotlin {")
@@ -521,6 +521,8 @@ fun generateVersionCatalog(config: ProjectConfig): String = buildString {
     appendLine("hilt = { id = \"com.google.dagger.hilt.android\", version.ref = \"hilt\" }")
     appendLine("ksp = { id = \"com.google.devtools.ksp\", version.ref = \"ksp\" }")
     appendLine("kotlin-serialization = { id = \"org.jetbrains.kotlin.plugin.serialization\", version.ref = \"kotlin\" }")
+    appendLine("kotlin-parcelize = { id = \"org.jetbrains.kotlin.plugin.parcelize\", version.ref = \"kotlin\" }")
+    appendLine("app-android-flavors = { id = \"${config.packageName}.android.flavors\", version = \"unspecified\" }")
     if (config.useKtlint) {
         appendLine("ktlint = { id = \"org.jlleitschuh.gradle.ktlint\", version.ref = \"ktlint\" }")
     }
