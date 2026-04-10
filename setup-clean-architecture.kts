@@ -267,6 +267,8 @@ fun generateSettingsGradle(config: ProjectConfig): String = buildString {
     appendLine()
     appendLine("rootProject.name = \"${config.name}\"")
     appendLine("include(\":app\")")
+    appendLine()
+    appendLine("includeBuild(\"build-logic\")")
 }
 
 fun generateGradleProperties(): String = buildString {
@@ -305,6 +307,7 @@ fun generateAppBuildGradle(config: ProjectConfig): String = buildString {
         appendLine("    alias(libs.plugins.detekt)")
     }
     appendLine("    id(\"kotlin-parcelize\")")
+    appendLine("    id(\"${config.packageName}.android.flavors\")")
     appendLine("}")
     appendLine()
     appendLine("kotlin {")
@@ -336,37 +339,6 @@ fun generateAppBuildGradle(config: ProjectConfig): String = buildString {
     appendLine("                \"proguard-rules.pro\"")
     appendLine("            )")
     appendLine("        }")
-    appendLine("    }")
-    appendLine()
-    appendLine("    flavorDimensions += \"environment\"")
-    appendLine("    productFlavors {")
-    for (flavor in config.flavors) {
-        appendLine("        create(\"${flavor.name}\") {")
-        appendLine("            dimension = \"environment\"")
-        if (flavor.applicationIdSuffix != null) {
-            appendLine("            applicationIdSuffix = \"${flavor.applicationIdSuffix}\"")
-        }
-        if (flavor.versionNameSuffix != null) {
-            appendLine("            versionNameSuffix = \"${flavor.versionNameSuffix}\"")
-        }
-        appendLine("            resValue(\"string\", \"app_name\", \"\\\"${flavor.appName}\\\"\")")
-        appendLine("            buildConfigField(\"String\", \"BASE_URL\", \"\\\"${flavor.baseUrl}\\\"\")")
-        appendLine("            buildConfigField(\"String\", \"LABEL_NAME\", \"\\\"${flavor.name}\\\"\")")
-        appendLine("        }")
-    }
-    appendLine("    }")
-    appendLine()
-    appendLine("    sourceSets {")
-    for (flavor in config.flavors) {
-        val dirName = when (flavor.name) {
-            "development" -> "dev"
-            "production" -> "prod"
-            else -> flavor.name
-        }
-        appendLine("        getByName(\"${flavor.name}\") {")
-        appendLine("            res.srcDirs(\"src/$dirName/res\")")
-        appendLine("        }")
-    }
     appendLine("    }")
     appendLine()
     appendLine("    compileOptions {")
@@ -528,6 +500,12 @@ fun generateVersionCatalog(config: ProjectConfig): String = buildString {
     if (config.useDataStore) {
         appendLine("datastore-preferences = { group = \"androidx.datastore\", name = \"datastore-preferences\", version.ref = \"datastore\" }")
     }
+    appendLine("# Build Logic")
+    appendLine("android-gradlePlugin = { group = \"com.android.tools.build\", name = \"gradle\", version.ref = \"agp\" }")
+    appendLine("kotlin-gradlePlugin = { group = \"org.jetbrains.kotlin\", name = \"kotlin-gradle-plugin\", version.ref = \"kotlin\" }")
+    appendLine("compose-gradlePlugin = { group = \"org.jetbrains.kotlin\", name = \"compose-compiler-gradle-plugin\", version.ref = \"kotlin\" }")
+    appendLine()
+    appendLine("# Testing")
     appendLine("junit = { group = \"junit\", name = \"junit\", version.ref = \"junit\" }")
     appendLine("mockito-kotlin = { group = \"org.mockito.kotlin\", name = \"mockito-kotlin\", version.ref = \"mockitoKotlin\" }")
     appendLine("kotlinx-coroutines-test = { group = \"org.jetbrains.kotlinx\", name = \"kotlinx-coroutines-test\", version.ref = \"coroutines\" }")
@@ -1473,8 +1451,99 @@ object ArchitectureModule {
 }
 """.trimIndent()
 
+// ═══════════════════════════════════════════════════════════
+// ─── Build Logic Convention Module Templates ───
+// ═══════════════════════════════════════════════════════════
+
+fun generateBuildLogicSettingsGradle(config: ProjectConfig): String = buildString {
+    appendLine("pluginManagement {")
+    appendLine("    repositories {")
+    appendLine("        mavenCentral()")
+    appendLine("        gradlePluginPortal()")
+    appendLine("        google()")
+    appendLine("    }")
+    appendLine("}")
+    appendLine()
+    appendLine("dependencyResolutionManagement {")
+    appendLine("    repositories {")
+    appendLine("        google()")
+    appendLine("        mavenCentral()")
+    appendLine("    }")
+    appendLine("    versionCatalogs {")
+    appendLine("        create(\"libs\") {")
+    appendLine("            from(files(\"../gradle/libs.versions.toml\"))")
+    appendLine("        }")
+    appendLine("    }")
+    appendLine("}")
+    appendLine()
+    appendLine("rootProject.name = \"build-logic\"")
+    appendLine("include(\":convention\")")
+}
+
+fun generateBuildLogicGradleProperties(): String = buildString {
+    appendLine("# Gradle properties are not passed to included builds https://github.com/gradle/gradle/issues/2534")
+    appendLine("org.gradle.parallel=true")
+    appendLine("org.gradle.caching=true")
+    appendLine("org.gradle.configureondemand=true")
+}
+
+fun generateConventionBuildGradle(config: ProjectConfig): String = buildString {
+    appendLine("plugins {")
+    appendLine("    `kotlin-dsl`")
+    appendLine("}")
+    appendLine()
+    appendLine("group = \"${config.packageName}.build-logic\"")
+    appendLine()
+    appendLine("java {")
+    appendLine("    sourceCompatibility = JavaVersion.VERSION_17")
+    appendLine("    targetCompatibility = JavaVersion.VERSION_17")
+    appendLine("}")
+    appendLine()
+    appendLine("kotlin {")
+    appendLine("    jvmToolchain(17)")
+    appendLine("}")
+    appendLine()
+    appendLine("dependencies {")
+    appendLine("    compileOnly(libs.android.gradlePlugin)")
+    appendLine("    compileOnly(libs.kotlin.gradlePlugin)")
+    appendLine("    compileOnly(libs.compose.gradlePlugin)")
+    appendLine("}")
+    appendLine()
+    appendLine("gradlePlugin {")
+    appendLine("    plugins {")
+    appendLine("        register(\"androidFlavors\") {")
+    appendLine("            id = \"${config.packageName}.android.flavors\"")
+    appendLine("            implementationClass = \"AndroidAppFlavorsConventionPlugin\"")
+    appendLine("        }")
+    appendLine("    }")
+    appendLine("}")
+}
+
+fun generateAndroidAppFlavorsConventionPlugin(config: ProjectConfig): String = """
+import com.android.build.api.dsl.ApplicationExtension
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
+import ${config.packageName}.convention.configureFlavors
+
+class AndroidAppFlavorsConventionPlugin : Plugin<Project> {
+    override fun apply(target: Project) {
+        with(target) {
+            extensions.configure<ApplicationExtension> {
+                configureFlavors(this)
+            }
+        }
+    }
+}
+""".trimIndent()
+
 fun generateAppFlavor(config: ProjectConfig): String = buildString {
-    appendLine("package ${config.packageName}.flavor")
+    appendLine("package ${config.packageName}.convention")
+    appendLine()
+    appendLine("import com.android.build.api.dsl.ApplicationExtension")
+    appendLine("import com.android.build.api.dsl.ApplicationProductFlavor")
+    appendLine("import com.android.build.api.dsl.CommonExtension")
+    appendLine("import com.android.build.api.dsl.ProductFlavor")
     appendLine()
     appendLine("enum class FlavorDimension {")
     appendLine("    Environment")
@@ -1502,6 +1571,46 @@ fun generateAppFlavor(config: ProjectConfig): String = buildString {
         val separator = if (index < config.flavors.size - 1) "," else ""
         appendLine("    )$separator")
     }
+    appendLine("}")
+    appendLine()
+    appendLine("fun configureFlavors(")
+    appendLine("    commonExtension: CommonExtension<*, *, *, *, *, *>,")
+    appendLine("    flavorConfigurationBlock: ProductFlavor.(flavor: AppFlavor) -> Unit = {},")
+    appendLine(") {")
+    appendLine("    commonExtension.apply {")
+    appendLine("        flavorDimensions += FlavorDimension.Environment.name")
+    appendLine("        productFlavors {")
+    appendLine("            AppFlavor.values().forEach {")
+    appendLine("                create(it.name) {")
+    appendLine("                    dimension = it.dimension.name")
+    appendLine("                    flavorConfigurationBlock(this, it)")
+    appendLine("                    if (this@apply is ApplicationExtension && this is ApplicationProductFlavor) {")
+    appendLine("                        if (it.applicationIdSuffix != null) {")
+    appendLine("                            applicationIdSuffix = it.applicationIdSuffix")
+    appendLine("                        }")
+    appendLine("                        if (it.versionNameSuffix != null) {")
+    appendLine("                            versionNameSuffix = it.versionNameSuffix")
+    appendLine("                        }")
+    appendLine("                    }")
+    appendLine("                    resValue(\"string\", \"app_name\", \"\\\"${'$'}{it.appName}\\\"\")")
+    appendLine("                    buildConfigField(\"String\", \"BASE_URL\", \"\\\"${'$'}{it.baseApiUrl}\\\"\")")
+    appendLine("                    buildConfigField(\"String\", \"LABEL_NAME\", \"\\\"${'$'}{it.name}\\\"\")")
+    appendLine("                }")
+    appendLine("            }")
+    appendLine("        }")
+    appendLine("        sourceSets {")
+    config.flavors.forEach { flavor ->
+        val dirName = when (flavor.name) {
+            "development" -> "dev"
+            "production" -> "prod"
+            else -> flavor.name
+        }
+        appendLine("            getByName(\"${flavor.name}\") {")
+        appendLine("                res.srcDirs(\"src/$dirName/res\")")
+        appendLine("            }")
+    }
+    appendLine("        }")
+    appendLine("    }")
     appendLine("}")
 }
 
@@ -1647,9 +1756,14 @@ fun generateProject(config: ProjectConfig) {
     createFile(basePath, "$mainSrc/di/AppModule.kt", generateAppModule(config.packageName))
     createFile(basePath, "$mainSrc/di/ArchitectureModule.kt", generateArchitectureModule(config.packageName))
 
-    // ── Flavor ──
-    println("\n-- Product Flavors --")
-    createFile(basePath, "$mainSrc/flavor/AppFlavor.kt", generateAppFlavor(config))
+    // ── Build Logic Convention Module ──
+    println("\n-- Build Logic Convention --")
+    val conventionPkgPath = config.packageName.replace(".", "/")
+    createFile(basePath, "build-logic/settings.gradle.kts", generateBuildLogicSettingsGradle(config))
+    createFile(basePath, "build-logic/gradle.properties", generateBuildLogicGradleProperties())
+    createFile(basePath, "build-logic/convention/build.gradle.kts", generateConventionBuildGradle(config))
+    createFile(basePath, "build-logic/convention/src/main/java/AndroidAppFlavorsConventionPlugin.kt", generateAndroidAppFlavorsConventionPlugin(config))
+    createFile(basePath, "build-logic/convention/src/main/java/$conventionPkgPath/convention/AppFlavor.kt", generateAppFlavor(config))
 
     // ── Feature (empty) ──
     println("\n-- Feature Directory --")
